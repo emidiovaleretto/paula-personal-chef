@@ -2,16 +2,19 @@
 
 > Stack inherited from `memory/constitution.md`: Django 5.2 + DRF (JSON API only, no
 > server-rendered product UI), PostgreSQL in prod, `pytest-django`; React + TypeScript
+>
 > + Vite SPA tested with Jest + React Testing Library. This plan states decisions only
 > — no source code.
 
 ## Approach
+
 The backend derives *everything authoritative* server-side. The client never tells the
 server which menu it is ordering against: the server resolves the **current weekly
 menu** itself, so a stale or swapped menu can never be ordered from (covers the
 "newer menu became active" and "dish removed before submit" edge cases for free).
 
 Two endpoints carry the feature:
+
 1. **GET current weekly menu** — returns the active menu's dishes, the client's package
    and its item bounds, and the client's existing order for that menu (if any). This
    single call gives the SPA everything it needs to render the browse view, the empty
@@ -30,6 +33,7 @@ mapping, not a database table.
 ## Architecture & components
 
 ### Backend (Django apps under `backend/`)
+
 | Component | Responsibility |
 |-----------|----------------|
 | `accounts.Client` | Links an auth user to their meal `package`. (Assignment/management is out of scope — see spec; created via admin/factory for this slice.) |
@@ -41,6 +45,7 @@ mapping, not a database table.
 | DRF views/serializers | Thin HTTP layer over the two services; `IsAuthenticated`. |
 
 ### Frontend (React SPA under `frontend/`)
+
 | Component | Responsibility |
 |-----------|----------------|
 | `api/weeklyMenu.ts` | `getCurrentWeeklyMenu()`, `submitOrder(items)` — the only place that talks to the API (constitution §2). |
@@ -49,6 +54,7 @@ mapping, not a database table.
 | `OrderSummary` | Read-only view of a submitted order + confirmation. |
 
 ## Data model
+
 | Entity | Fields | Notes |
 |--------|--------|-------|
 | `accounts.Client` | `user` (1–1 → auth user), `package` (choices: `EXPRESS`/`STANDARD`/`FULL_WEEK`, **nullable**) | `null` package = safety-rule "no package" case. Normally set at client creation (out of scope). |
@@ -64,9 +70,11 @@ Validation rule is uniform: `min ≤ total_items ≤ max` (exact packages have `
 ## Interfaces / contracts
 
 ### `GET /api/weekly-menu/current/`
-- **Auth:** required → `401` if unauthenticated.
-- **Input:** none (menu resolved server-side).
-- **Output `200`:**
+
++ **Auth:** required → `401` if unauthenticated.
++ **Input:** none (menu resolved server-side).
++ **Output `200`:**
+
   ```
   {
     menu: { id, week_start, dishes: [{ id, name, description }] } | null,
@@ -76,15 +84,18 @@ Validation rule is uniform: `min ≤ total_items ≤ max` (exact packages have `
                       total_items } | null
   }
   ```
-  - `menu: null` → "no menu available this week" empty state.
-  - `package: null` → client has no package → SPA shows "contact the chef" (ordering disabled).
-  - `existing_order` present → SPA renders read-only summary, hides the selector.
+
+  + `menu: null` → "no menu available this week" empty state.
+  + `package: null` → client has no package → SPA shows "contact the chef" (ordering disabled).
+  + `existing_order` present → SPA renders read-only summary, hides the selector.
 
 ### `POST /api/orders/`
-- **Auth:** required → `401`.
-- **Input:** `{ items: [{ dish_id, quantity }] }` (menu is *not* accepted from the client).
-- **Output `201`:** the created order (same shape as `existing_order` above), `status = "Submitted"`.
-- **Errors (JSON body with a clear message):**
+
++ **Auth:** required → `401`.
++ **Input:** `{ items: [{ dish_id, quantity }] }` (menu is *not* accepted from the client).
++ **Output `201`:** the created order (same shape as `existing_order` above), `status = "Submitted"`.
++ **Errors (JSON body with a clear message):**
+
   | Status | Condition |
   |--------|-----------|
   | `401` | Not authenticated. |
@@ -96,46 +107,50 @@ All order creation flows through `orders.services.place_order(...)` inside a DB
 transaction so a rejected order leaves nothing behind.
 
 ## Validation & rules
-- **Login required** on both endpoints (`IsAuthenticated`).
-- **Menu authority:** the current menu is resolved server-side; every submitted
+
++ **Login required** on both endpoints (`IsAuthenticated`).
++ **Menu authority:** the current menu is resolved server-side; every submitted
   `dish_id` must belong to *that* menu, else `400` (covers stale/removed dishes).
-- **One order per menu:** DB `unique_together(client, weekly_menu)` + a pre-check in the
++ **One order per menu:** DB `unique_together(client, weekly_menu)` + a pre-check in the
   service returning `409` with the existing order (no duplicate creation on race).
-- **Package bounds:** `total = Σ quantity`; require `min ≤ total ≤ max` for the client's
++ **Package bounds:** `total = Σ quantity`; require `min ≤ total ≤ max` for the client's
   package. Empty/zero selection fails the lower bound → `400`.
-- **Quantities:** each `quantity ≥ 1`; a dish may appear once per payload (quantities
++ **Quantities:** each `quantity ≥ 1`; a dish may appear once per payload (quantities
   express repeats). Duplicate `dish_id` entries are rejected or summed → **rejected** for
   simplicity and predictability.
-- **No package → cannot order** (`403`); surfaced on GET as `package: null`.
-- **Menu rollover:** because the menu is resolved per-request, a selection built against
++ **No package → cannot order** (`403`); surfaced on GET as `package: null`.
++ **Menu rollover:** because the menu is resolved per-request, a selection built against
   an old menu simply fails validation against the new current menu; the SPA re-fetches
   and shows the new menu (matches spec's "discard and show new menu").
 
 ## Security considerations
-- **Auth mechanism:** Django **session authentication** (built-in, per constitution's
+
++ **Auth mechanism:** Django **session authentication** (built-in, per constitution's
   "prefer built-ins") with the SPA sending credentials; **CSRF enforced** on the POST
   (session cookie + `X-CSRFToken`). CORS allows only the configured frontend origin(s)
   per environment, with credentials — never wildcard in prod. (Login itself is a
   separate feature; this plan only consumes `request.user`.)
-- **Ownership:** a client can only read/create *their own* order; `existing_order` and
++ **Ownership:** a client can only read/create *their own* order; `existing_order` and
   `place_order` are always scoped to `request.user`'s `Client`. No order id is ever
   taken from the client to fetch someone else's order.
-- **Input validation** at the serializer boundary (dish ids, quantities, shapes);
++ **Input validation** at the serializer boundary (dish ids, quantities, shapes);
   services never trust pre-validated-by-SPA data.
-- **No secrets in the SPA bundle**; no personal data logged. Env config fails loudly if
++ **No secrets in the SPA bundle**; no personal data logged. Env config fails loudly if
   missing (constitution §1).
-- Prices/payment are out of scope, so no money handling surface here.
++ Prices/payment are out of scope, so no money handling surface here.
 
 ## Constitution check
-- [ ] Backend is JSON API only; all UI in the React SPA. ✔ (two JSON endpoints, no templates)
-- [ ] Django built-ins preferred (auth/session/CSRF); third-party only if justified. ✔ (`django-cors-headers` is the one justified add for the split-origin SPA)
-- [ ] Fat models/services, thin views; validation in serializers/services, not views. ✔
-- [ ] TypeScript SPA, API calls isolated in an `api/` layer, small presentational components. ✔
-- [ ] Every acceptance criterion has a test (backend `APIClient` and/or Jest + RTL). ✔ (mapped in `tasks.md`)
-- [ ] Argon2/secrets-from-env/CSRF/session protections respected; SPA never trusted. ✔
-- [ ] PostgreSQL in prod; migrations reviewed; one app per bounded domain. ✔
+
++ [ ] Backend is JSON API only; all UI in the React SPA. ✔ (two JSON endpoints, no templates)
++ [ ] Django built-ins preferred (auth/session/CSRF); third-party only if justified. ✔ (`django-cors-headers` is the one justified add for the split-origin SPA)
++ [ ] Fat models/services, thin views; validation in serializers/services, not views. ✔
++ [ ] TypeScript SPA, API calls isolated in an `api/` layer, small presentational components. ✔
++ [ ] Every acceptance criterion has a test (backend `APIClient` and/or Jest + RTL). ✔ (mapped in `tasks.md`)
++ [ ] Argon2/secrets-from-env/CSRF/session protections respected; SPA never trusted. ✔
++ [ ] PostgreSQL in prod; migrations reviewed; one app per bounded domain. ✔
 
 ## Acceptance-criteria coverage (spec → plan)
+
 | Spec AC | Covered by |
 |---------|-----------|
 | See menu + package + required count | GET `weekly-menu/current` response |
