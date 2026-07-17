@@ -26,6 +26,11 @@ PACKAGE_BOUNDS: dict[str, tuple[int, int]] = {
 }
 
 
-def bounds_for(package: str) -> tuple[int, int]:
-    """Return the inclusive (min, max) item bounds for a package code."""
-    return PACKAGE_BOUNDS[package]
+def bounds_for(package: str) -> tuple[int, int] | None:
+    """Return the inclusive (min, max) item bounds for a package code.
+
+    Returns None for an unassigned or unrecognized package (e.g. the
+    no-package safety-rule case), rather than raising, so callers can turn
+    it into the blocked-from-ordering message instead of a 500.
+    """
+    return PACKAGE_BOUNDS.get(package)

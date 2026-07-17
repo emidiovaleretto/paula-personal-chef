@@ -16,7 +16,10 @@ class WeeklyMenu(models.Model):
     is_active = models.BooleanField(default=True)
 
     class Meta:
-        ordering = ["-published_at"]
+        # nulls_last pins NULL placement explicitly: Postgres defaults NULLs
+        # first on DESC, SQLite defaults them last, which would otherwise
+        # flip whether a draft outranks the latest published menu by environment.
+        ordering = [models.F("published_at").desc(nulls_last=True)]
 
     def __str__(self) -> str:
         return f"WeeklyMenu(week_start={self.week_start})"
