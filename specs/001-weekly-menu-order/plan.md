@@ -57,11 +57,11 @@ mapping, not a database table.
 
 | Entity | Fields | Notes |
 |--------|--------|-------|
-| `accounts.Client` | `user` (1–1 → auth user), `package` (choices: `EXPRESS`/`STANDARD`/`FULL_WEEK`, **nullable**) | `null` package = safety-rule "no package" case. Normally set at client creation (out of scope). |
+| `accounts.Client` | `user` (1–1 → auth user), `package` (choices: `EXPRESS`/`STANDARD`/`FULL_WEEK`, **optional**) | `empty` package = safety-rule "no package" case. Normally set at client creation (out of scope). |
 | `menu.WeeklyMenu` | `week_start` (date), `is_published` (bool), `published_at` (datetime, nullable), `is_active` (bool) | "Current" = `is_published & is_active`, latest `published_at`. `week_start` set by chef at publish (Europe/Dublin). |
 | `menu.Dish` | `weekly_menu` (FK), `name`, `description` | A dish belongs to exactly one weekly menu. Unlimited availability (no stock field — cook-to-order). |
-| `orders.Order` | `client` (FK), `weekly_menu` (FK), `status` (choices, default `SUBMITTED`), `created_at` | **`unique_together(client, weekly_menu)`** enforces one order per menu. Only `SUBMITTED` used this slice; field sized for future `CONFIRMED`. |
-| `orders.OrderItem` | `order` (FK), `dish` (FK → must belong to the order's menu), `quantity` (PositiveSmallInteger ≥ 1) | Same dish appears at most once per order; multiples expressed via `quantity`. |
+| `orders.Order` | `client` (FK), `weekly_menu` (FK), `status` (choices, default `SUBMITTED`), `notes` (text, optional), `created_at` | **`UniqueConstraint(client, weekly_menu)`** named `one_order_per_client_per_menu` enforces one order per menu. Only `SUBMITTED` is written this slice; the field carries `SUBMITTED`/`CONFIRMED`/`COMPLETED`/`CANCELED` for future transitions. `notes` is free text the client may attach (allergies, restrictions, preferences); optional. |
+| `orders.OrderItem` | `order` (FK), `dish` (FK → must belong to the order's menu, `PROTECT`), `quantity` (PositiveSmallInteger ≥ 1) | **`UniqueConstraint(order, dish)`** named `unique_dish_per_order`: a dish appears at most once per order; multiples expressed via `quantity`. |
 
 Package bounds (code constant, not a table):
 `EXPRESS → (4, 5)`, `STANDARD → (7, 7)`, `FULL_WEEK → (11, 11)`.
@@ -79,7 +79,7 @@ Validation rule is uniform: `min ≤ total_items ≤ max` (exact packages have `
   {
     menu: { id, week_start, dishes: [{ id, name, description }] } | null,
     package: { code, label, min_items, max_items } | null,
-    existing_order: { id, status, created_at,
+    existing_order: { id, status, created_at, notes,
                       items: [{ dish_id, dish_name, quantity }],
                       total_items } | null
   }
@@ -92,7 +92,9 @@ Validation rule is uniform: `min ≤ total_items ≤ max` (exact packages have `
 ### `POST /api/orders/`
 
 + **Auth:** required → `401`.
-+ **Input:** `{ items: [{ dish_id, quantity }] }` (menu is *not* accepted from the client).
++ **Input:** `{ items: [{ dish_id, quantity }], notes? }` (menu is *not* accepted from the
+  client). `notes` is optional free text (allergies/restrictions/preferences); omitted or
+  empty is valid.
 + **Output `201`:** the created order (same shape as `existing_order` above), `status = "Submitted"`.
 + **Errors (JSON body with a clear message):**
 
@@ -111,7 +113,7 @@ transaction so a rejected order leaves nothing behind.
 + **Login required** on both endpoints (`IsAuthenticated`).
 + **Menu authority:** the current menu is resolved server-side; every submitted
   `dish_id` must belong to *that* menu, else `400` (covers stale/removed dishes).
-+ **One order per menu:** DB `unique_together(client, weekly_menu)` + a pre-check in the
++ **One order per menu:** DB `UniqueConstraint(client, weekly_menu)` + a pre-check in the
   service returning `409` with the existing order (no duplicate creation on race).
 + **Package bounds:** `total = Σ quantity`; require `min ≤ total ≤ max` for the client's
   package. Empty/zero selection fails the lower bound → `400`.
