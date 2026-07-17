@@ -57,7 +57,7 @@ mapping, not a database table.
 
 | Entity | Fields | Notes |
 |--------|--------|-------|
-| `accounts.Client` | `user` (1–1 → auth user), `package` (choices: `EXPRESS`/`STANDARD`/`FULL_WEEK`, **nullable**) | `null` package = safety-rule "no package" case. Normally set at client creation (out of scope). |
+| `accounts.Client` | `user` (1–1 → auth user), `package` (choices: `EXPRESS`/`STANDARD`/`FULL_WEEK`, **optional**) | `empty` package = safety-rule "no package" case. Normally set at client creation (out of scope). |
 | `menu.WeeklyMenu` | `week_start` (date), `is_published` (bool), `published_at` (datetime, nullable), `is_active` (bool) | "Current" = `is_published & is_active`, latest `published_at`. `week_start` set by chef at publish (Europe/Dublin). |
 | `menu.Dish` | `weekly_menu` (FK), `name`, `description` | A dish belongs to exactly one weekly menu. Unlimited availability (no stock field — cook-to-order). |
 | `orders.Order` | `client` (FK), `weekly_menu` (FK), `status` (choices, default `SUBMITTED`), `created_at` | **`unique_together(client, weekly_menu)`** enforces one order per menu. Only `SUBMITTED` used this slice; field sized for future `CONFIRMED`. |
