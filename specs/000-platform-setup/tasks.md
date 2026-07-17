@@ -55,6 +55,9 @@
 
 - [ ] P014 Ensure a pre-commit or pre-push hook runs a **configuration sanity check** that fails loudly if any required env var is missing or misconfigured or a secret is exposed. — (§1 Shared)
 
+## HTTPS / TLS termination
+- [ ] P015 Configure the **HTTPS-redirect pair together** in `production.py` once the deploy platform/proxy is known (P001): `SECURE_SSL_REDIRECT = True` **and** its companion `SECURE_PROXY_SSL_HEADER` (e.g. `("HTTP_X_FORWARDED_PROTO", "https")` for a standard TLS-terminating proxy). They **must ship as a pair** — `SECURE_SSL_REDIRECT` alone behind a TLS-terminating proxy causes an infinite redirect loop. Only set `SECURE_PROXY_SSL_HEADER` when the proxy is guaranteed to set/overwrite that header (trusting a client-supplied header otherwise is a spoofing vector). — (§6, §4)
+
 ## Notes
 
 - The `001-weekly-menu-order` feature deliberately does **not** cover any of the above:
