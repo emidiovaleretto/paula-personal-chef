@@ -1,0 +1,40 @@
+from django.db import models
+
+
+class WeeklyMenu(models.Model):
+    """A weekly menu the chef publishes.
+
+    The "current" menu is the most recently published, still-active one
+    (see `menu.services.current_weekly_menu`). `week_start` is set by the chef at
+    publish time (interpreted in Europe/Dublin). Authoring/publishing is out of scope
+    for this feature; records are created via admin/factory.
+    """
+
+    week_start = models.DateField()
+    is_published = models.BooleanField(default=False)
+    published_at = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["-published_at"]
+
+    def __str__(self) -> str:
+        return f"WeeklyMenu(week_start={self.week_start})"
+
+
+class Dish(models.Model):
+    """A dish available on a specific weekly menu.
+
+    Availability is unlimited within the week (cook-to-order) — there is no stock field.
+    """
+
+    weekly_menu = models.ForeignKey(
+        WeeklyMenu,
+        on_delete=models.CASCADE,
+        related_name="dishes",
+    )
+    name = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+
+    def __str__(self) -> str:
+        return self.name

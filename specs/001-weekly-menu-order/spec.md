@@ -61,6 +61,9 @@ as two items.
 - [ ] Given my selection total does **not** satisfy my package's required count, when I
   attempt to submit, then submission is blocked and I am told what count my package
   requires.
+- [ ] Given I am composing my order, when I add optional free-text notes (allergies,
+  dietary restrictions, or preferences) and submit, then the notes are saved with my
+  order and shown back to me; submitting with no notes is equally valid.
 - [ ] Given I have already submitted an order for the current weekly menu, when I view
   the menu again, then I see my existing submitted order and I am **not** offered a way
   to create a second order for that menu.
@@ -78,6 +81,9 @@ as two items.
 - Selecting dishes and quantities, with a live running item total.
 - Blocking additions once the package maximum is reached, with an explanatory message.
 - Submitting exactly one order per client per weekly menu, ending in status **Submitted**.
+- Optionally attaching free-text **notes** to the order (allergies, dietary restrictions,
+  or preferences for that specific order). Notes are optional — an order with no notes
+  is perfectly valid.
 - Enforcing on submit: the item total satisfies the package (Express 4–5, Standard 7,
   Full Week 11), all dishes belong to the current published menu, login is required,
   and only one order per weekly menu exists.
