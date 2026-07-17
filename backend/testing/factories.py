@@ -61,5 +61,8 @@ class OrderItemFactory(factory.django.DjangoModelFactory):
         model = OrderItem
 
     order = factory.SubFactory(OrderFactory)
-    dish = factory.SubFactory(DishFactory)
+    dish = factory.SubFactory(
+        DishFactory,
+        weekly_menu=factory.SelfAttribute("..order.weekly_menu"),
+    )
     quantity = 1

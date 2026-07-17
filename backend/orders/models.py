@@ -52,6 +52,8 @@ class Order(models.Model):
     @property
     def total_items(self) -> int:
         """Total servings across all items (sum of quantities)."""
+        if "items" in getattr(self, "_prefetched_objects_cache", {}):
+            return sum(item.quantity for item in self.items.all())
         return self.items.aggregate(total=Sum("quantity"))["total"] or 0
 
 
@@ -78,7 +80,13 @@ class OrderItem(models.Model):
             models.UniqueConstraint(
                 fields=["order", "dish"],
                 name="unique_dish_per_order",
-            )
+            ),
+            # MinValueValidator only runs via full_clean()/serializer validation;
+            # this backs the same >=1 rule with a DB-level guarantee.
+            models.CheckConstraint(
+                condition=models.Q(quantity__gte=1),
+                name="orderitem_quantity_gte_1",
+            ),
         ]
 
     def __str__(self) -> str:

@@ -20,6 +20,15 @@ class WeeklyMenu(models.Model):
         # first on DESC, SQLite defaults them last, which would otherwise
         # flip whether a draft outranks the latest published menu by environment.
         ordering = [models.F("published_at").desc(nulls_last=True)]
+        constraints = [
+            # is_published and published_at are two separate fields per plan
+            # §Data model; this stops them drifting apart in the direction
+            # that matters (marked published with no timestamp).
+            models.CheckConstraint(
+                condition=models.Q(is_published=False) | models.Q(published_at__isnull=False),
+                name="weeklymenu_published_at_set_when_published",
+            )
+        ]
 
     def __str__(self) -> str:
         return f"WeeklyMenu(week_start={self.week_start})"

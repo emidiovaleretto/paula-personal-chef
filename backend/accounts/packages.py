@@ -6,14 +6,15 @@ the counts) rather than in a database table (plan §Data model).
 """
 
 from django.db import models
+from django.utils.translation import gettext_lazy as _
 
 
 class Package(models.TextChoices):
     """Meal package codes and human-readable names."""
 
-    EXPRESS = "EXPRESS"
-    STANDARD = "STANDARD"
-    FULL_WEEK = "FULL_WEEK"
+    EXPRESS = "EXPRESS", _("Express")
+    STANDARD = "STANDARD", _("Standard")
+    FULL_WEEK = "FULL_WEEK", _("Full week")
 
 
 # Inclusive (min, max) total-item bounds per package.
